@@ -18,14 +18,23 @@ DEFAULT_QUALITIES.extend([
 
 
 class Chord():
-    def __init__(self, name) -> None:
+    def __init__(self, name, clean_chord=False) -> None:
         self.name = name.strip()
-        self.latex_name = self.name.replace("#", "\#").replace("b", "♭")
-        self.display_name = self.name.replace("/","|")
+        print(self.name)
+        if clean_chord:
+            self.name = self.get_clean_chord()
         
-    def get_pychord(self):
+    @property
+    def latex_name(self):
+        return self.name.replace("#", "\#").replace("b", "♭")
+
+    @property
+    def display_name(self):
+        return self.name.replace("/", "|")
+        
+    def get_clean_chord(self):
         chord = self.name
-        all_replacements = [("min", "m"), ("mi", "m"), ("-", "m"), ("ma", "M"), ("maj", "M"), ("Ma", "M"), ("MA", "M"), ("♭", "b"), ("♯", "#"), ("6/9", "69")]
+        all_replacements = [("min", "m"), ("mi", "m"), ("-", "m"), ("maj", "M"), ("ma", "M"), ("MAJ", "M"), ("Mj", "M"), ("Maj", "M"), ("Ma", "M"), ("MA", "M"), ("♭", "b"), ("♯", "#"), ("6/9", "69"), ("°", "dim")]
     
         for a, b in all_replacements:
             chord = chord.replace(a, b)
@@ -33,15 +42,20 @@ class Chord():
         if chord.startswith("(") and chord.endswith(")"):
             chord = chord[1:-1]
 
-        pattern = r'([^\(\)]+)(\([^\)]*\))*'
-        chord = re.match(pattern, chord).group(1)
         alt = re.findall(r'\(([^\)]*)\)', chord)
         alt = alt[0] if len(alt) > 0 else None
+        pattern = r'([^\(\)]+)(\([^\)]*\))*'
+        chord = re.match(pattern, chord).group(1)
         
         if (alt is not None) and (alt[0] in "b#") and (len(alt) == 2):
             chord += alt
         elif (alt is not None) and (alt.startswith("add")):
             chord += alt
+        
+        return chord
+        
+    def get_pychord(self):
+        chord = self.get_clean_chord()
         
         try:
             return PyChord(chord)
@@ -101,7 +115,7 @@ class ChordGroup():
         for line in chords:
             line_group = []
             for measure in line:
-                line_group.append([Chord(c) for c in measure])
+                line_group.append([Chord(c, True) for c in measure])
             self.chords.append(line_group)
         
     def to_text(self):
@@ -235,13 +249,13 @@ with st.expander("Details", False):
     st.write("For more details on ABC: http://anamnese.online.fr/site2/pageguide_abc.php")
     grid_size = st.selectbox("Grid size", ["\Large", "\huge", "\Huge"], format_func=lambda x: x[1:], key="grid_size")
 
-
-st.latex(
-    grid_size +
-    r" \begin{array}{|c|c|c|c|} \hline " +
-    r"\\ \hline ".join([" & ".join([" / ".join(r"\text{" + t + r"}" for t in c) for c in line]) for line in st.session_state.grid]) +
-    r" \\ \hline \end{array}"
-)
+if len(st.session_state.grid) > 0:
+    st.latex(
+        grid_size +
+        r" \begin{array}{|c|c|c|c|} \hline " +
+        r"\\ \hline ".join([" & ".join([" / ".join(r"\text{" + t + r"}" for t in c) for c in line]) for line in st.session_state.grid]) +
+        r" \\ \hline \end{array}"
+    )
 
 embed_code = f"""
 <script src="https://cdn.jsdelivr.net/npm/abcjs@6.2.3/dist/abcjs-basic-min.js"></script>
