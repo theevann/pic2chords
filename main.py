@@ -21,6 +21,7 @@ class Chord():
     def __init__(self, name) -> None:
         self.name = name.strip()
         self.latex_name = self.name.replace("#", "\#").replace("b", "♭")
+        self.display_name = self.name.replace("/","|")
         
     def get_pychord(self):
         chord = self.name
@@ -124,7 +125,7 @@ class ChordGroup():
             for c in chord_group:
                 notes = c.get_abc()
                 time = "" if len(chord_group) == 1 else f"1/{len(chord_group)}"
-                abc += f'"{c.name}"[{notes}]{time} '
+                abc += f'"{c.display_name}"[{notes}]{time} '
             abc += " | " if (i+1) % self.notes_per_line != 0 else "\n"
         return abc
 
