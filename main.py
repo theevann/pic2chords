@@ -154,7 +154,7 @@ if "chords" not in st.session_state:
     st.session_state.grid = []
 
 
-@st.cache_data
+# @st.cache_data
 def predict(image):
     prompt = "Extract the key and all the chord symbols above the staff in a list. On the first line, write the key (eg K: Cm), then on the second line, write L:, then answer only with the lists of list of symbols [], one list per staff line, separating chord symbols with commas, separating lists with semicolon ';'. If there are more than one chord within one measure, do not separate them with a comma. Example:\nK: Cm\nL: [A, Bm, Cb-7];[D, E#, F7 D#]]\nHere F7 and D# are in the same measure."  
 
