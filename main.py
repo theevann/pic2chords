@@ -24,7 +24,7 @@ class Chord():
         
     def get_pychord(self):
         chord = self.name
-        all_replacements = [("min", "m"), ("mi", "m"), ("-", "m"), ("ma", "M"), ("Ma", "M"), ("MA", "M"), ("♭", "b"), ("♯", "#"), ("6/9", "69")]
+        all_replacements = [("min", "m"), ("mi", "m"), ("-", "m"), ("ma", "M"), ("maj", "M"), ("Ma", "M"), ("MA", "M"), ("♭", "b"), ("♯", "#"), ("6/9", "69")]
     
         for a, b in all_replacements:
             chord = chord.replace(a, b)
