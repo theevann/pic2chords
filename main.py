@@ -115,8 +115,10 @@ class ChordGroup():
         for line in chords:
             line_group = []
             for measure in line:
-                line_group.append([Chord(c, True) for c in measure])
-            self.chords.append(line_group)
+                if ms := [Chord(c, True) for c in measure]:
+                    line_group.append(ms)
+            if len(line_group) > 0:
+                self.chords.append(line_group)
         
     def to_text(self):
         return "\n".join([
@@ -129,8 +131,10 @@ class ChordGroup():
         for line in text.split("\n"):
             line_group = []
             for measure in line.split("|"):
-                line_group.append([Chord(c) for c in measure.split() if c != ""])
-            self.chords.append(line_group)
+                if ms := [Chord(c) for c in measure.split() if c != ""]:
+                    line_group.append(ms)
+            if line_group:
+                self.chords.append(line_group)
 
     def to_abc(self, key="C"):
         abc = f"K:{key}\nL:4/4\n"
@@ -148,6 +152,7 @@ class ChordGroup():
         line = []
         flatten_chords = [c for line in self.chords for c in line]
         for i, chord_group in enumerate(flatten_chords):
+            
             chord_group = [c.latex_name for c in chord_group]
             line.append(chord_group)
             if i % 4 == 3:
@@ -242,12 +247,14 @@ if file is not None:
         st.session_state.abc_notation = st.session_state.chords.to_abc(key=st.session_state.key)
         st.session_state.grid = st.session_state.chords.to_grid()
 
+
 st.text_area("Chords", height=200, key="chords_txt", on_change=update)
 
 with st.expander("Details", False):
     st.text_area("ABC notation", height=200, key="abc_notation")
     st.write("For more details on ABC: http://anamnese.online.fr/site2/pageguide_abc.php")
     grid_size = st.selectbox("Grid size", ["\Large", "\huge", "\Huge"], format_func=lambda x: x[1:], key="grid_size")
+
 
 if len(st.session_state.grid) > 0:
     st.latex(
