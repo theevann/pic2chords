@@ -257,16 +257,40 @@ if len(st.session_state.grid) > 0:
         r" \\ \hline \end{array}"
     )
 
-embed_code = f"""
-<script src="https://cdn.jsdelivr.net/npm/abcjs@6.2.3/dist/abcjs-basic-min.js"></script>
-<div id="paper"></div>
-<script type="text/javascript">
-    function renderABC() {{
-        ABCJS.renderAbc("paper", `{st.session_state.abc_notation}`);
-    }}
-    // Call the render function when the window loads
-    window.onload = renderABC;
-</script>
-"""
+    embed_code = f"""
+    <script src="https://cdn.jsdelivr.net/npm/abcjs@6.2.3/dist/abcjs-basic-min.js"></script>
+    <div id="paper"></div>
+    <script type="text/javascript">
+        function renderABC() {{
+            var visualObj = ABCJS.renderAbc("paper", `%%stretchlast\n%%staffwidth 600\n{st.session_state.abc_notation}`, staffwidth=4000, stretchlast=true);
+            visualObj[0].setUpAudio();
+        }}
+        
+        function saveSvg() {{
+            let svgElement = document.querySelector("#paper svg");
+            svgElement.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+            var svgData = svgElement.outerHTML;
+            var preface = '<?xml version="1.0" standalone="no"?>\\r\\n';
+            var svgBlob = new Blob([preface, svgData], {{type:"image/svg+xml;charset=utf-8"}});
+            var svgUrl = URL.createObjectURL(svgBlob);
+            var downloadLink = document.createElement("a");
+            downloadLink.href = svgUrl;
+            downloadLink.download = "music_score.svg";
+            downloadLink.click();
+        }}
 
-html(embed_code, height=650, scrolling=True)
+        function addDownloadButton() {{
+            let btn = document.createElement("button");
+            btn.textContent = "Download as SVG";
+            btn.onclick = saveSvg;
+            document.body.appendChild(btn);
+        }}
+
+        window.onload = () => {{
+            renderABC();
+            addDownloadButton();
+        }};
+    </script>
+    """
+
+    html(embed_code, height=650, scrolling=True)
