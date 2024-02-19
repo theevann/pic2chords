@@ -1,13 +1,15 @@
 import base64
 import re
+from io import BytesIO
 
-from openai import OpenAI
 import streamlit as st
-from streamlit.components.v1 import html
+from openai import OpenAI
+from PIL import Image
 from pychord import Chord as PyChord
 from pychord.constants.qualities import DEFAULT_QUALITIES
-from pychord.constants.scales import SHARPED_SCALE, FLATTED_SCALE, SCALE_VAL_DICT
-
+from pychord.constants.scales import (FLATTED_SCALE, SCALE_VAL_DICT,
+                                      SHARPED_SCALE)
+from streamlit.components.v1 import html
 
 DEFAULT_QUALITIES.extend([
     ("ø", (0, 3, 6, 10)),
@@ -225,12 +227,20 @@ def update():
     st.session_state.abc_notation = st.session_state.chords.to_abc(key=st.session_state.key)
     st.session_state.grid = st.session_state.chords.to_grid()
  
+st.title('Chords Extracter')
+st.markdown("This app extracts the chords written as text from an image of a music sheet and displays them in a grid and in ABC notation.")
 
+example_button = st.container()
 
 with st.form(key='my_form'):
-    file = st.file_uploader("Upload file", type=["jpeg", "jpg", "png"])
+    file = st.file_uploader("Upload an image of a music sheet", type=["jpeg", "jpg", "png"])
     submit_button = st.form_submit_button(label='Submit')
 
+if example_button.button("Try with an example image"):
+    img = Image.open("example.jpg")
+    file = BytesIO()
+    img.save(file, format='jpeg')
+    submit_button = True
 
 if file is not None:
     st.image(file, caption='Uploaded Image', use_column_width=True)
