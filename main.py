@@ -184,7 +184,7 @@ def predict(image):
     encoded_image = base64.b64encode(image.getvalue()).decode('utf-8')
     
     response = client.chat.completions.create(
-        model="gpt-4-vision-preview",
+        model="gpt-4o",
         messages=[
             {
             "role": "user",
