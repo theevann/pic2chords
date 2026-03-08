@@ -1,4 +1,5 @@
 import base64
+import json
 import re
 from io import BytesIO
 
@@ -11,12 +12,48 @@ from pychord.constants.scales import (FLATTED_SCALE, SCALE_VAL_DICT,
                                       SHARPED_SCALE)
 from streamlit.components.v1 import html
 
+
+LLM_MODEL = "gpt-5.4"
+
+CHORD_EXTRACTION_SYSTEM_PROMPT = """You are a music sheet chord extractor.
+
+Task:
+Extract the key and all chord symbols visually written above the staff from the image.
+
+Output:
+Return valid JSON only, with this exact schema:
+{"key": "", "chords": []}
+
+Schema:
+- "key": string representing the key signature
+- "chords": array of staff lines
+- each staff line is an array of measures
+- each measure is an array of chord symbols
+- each chord symbol is a string
+
+Extraction rules:
+1. Read chord symbols from left to right, line by line, top to bottom.
+2. Group chords by visible staff line, then by measure.
+3. If multiple chord symbols appear in the same measure, include all of them in order in that measure's array.
+4. Include repeated chords exactly as they appear.
+5. Extract only what is visually present. Do not infer, complete, transpose, normalize, or correct anything.
+6. If a chord symbol is present but unreadable, use "?".
+7. Ignore lyrics, dynamics, fingerings, rehearsal marks, and other non-chord text unless it is clearly the key.
+8. Preserve chord spelling exactly as written, including sharps, flats, slashes, diminished, augmented, and seventh markers.
+
+Valid example:
+{"key":"Cm","chords":[[["Am"],["F"],["C"]],[["G"],["Am"],["F7","D#"]],[["C"],["G"]]]}
+"""
+
+
 DEFAULT_QUALITIES.extend([
     ("ø", (0, 3, 6, 10)),
     ("°", (0, 3, 6, 9)),
     ("Δ", (0, 4, 7, 11)),
     ("7M", (0, 4, 7, 11)),
-    ("M13", (0, 4, 7, 11, 14, 21))
+    ("7sus", (0, 5, 7, 10)),
+    ("M13", (0, 4, 7, 11, 14, 21)),
+    ("+7", (0, 4, 8, 10))
 ])
 
 
@@ -37,7 +74,7 @@ class Chord():
         
     def get_clean_chord(self):
         chord = self.name
-        all_replacements = [("min", "m"), ("mi", "m"), ("-", "m"), ("maj", "M"), ("ma", "M"), ("MAJ", "M"), ("Mj", "M"), ("Maj", "M"), ("Ma", "M"), ("MA", "M"), ("♭", "b"), ("♯", "#"), ("6/9", "69"), ("°", "dim")]
+        all_replacements = [("min", "m"), ("mi", "m"), ("MI", "m"), ("-", "m"), ("maj", "M"), ("ma", "M"), ("MAJ", "M"), ("Mj", "M"), ("Maj", "M"), ("Ma", "M"), ("MA", "M"), ("♭", "b"), ("♯", "#"), ("6/9", "69"), ("°", "dim")]
     
         for a, b in all_replacements:
             chord = chord.replace(a, b)
@@ -179,35 +216,42 @@ if "chords" not in st.session_state:
 
 # @st.cache_data
 def predict(image):
-    prompt = "Extract the key and all the chord symbols above the staff in a list. On the first line, write the key (eg K: Cm), then on the second line, write L:, then answer only with the lists of list of symbols [], one list per staff line, separating chord symbols with commas, separating lists with semicolon ';'. If there are more than one chord within one measure, do not separate them with a comma. Example:\nK: Cm\nL: [A, Bm, Cb-7];[D, E#, F7 D#]]\nHere F7 and D# are in the same measure."  
-
     encoded_image = base64.b64encode(image.getvalue()).decode('utf-8')
     
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model=LLM_MODEL,
         messages=[
-            {
+        {
+            "role": "system",
+            "content": CHORD_EXTRACTION_SYSTEM_PROMPT,
+        },
+        {
             "role": "user",
             "content": [
-                {"type": "text", "text": prompt},
+                {"type": "text", "text": "Extract the key and chord symbols from this image:"},
                 {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{encoded_image}",
-                    "detail": "high"
-                },
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{encoded_image}",
+                        "detail": "high",
+                    },
                 },
             ],
-            }
-        ],
-        max_tokens=300,
+        },
+    ],
+        response_format={"type": "json_object"},
+        max_completion_tokens=300,
     )
+    
+    print(response)
 
     return response.choices[0].message.content
 
 
-def parse_prediction(prediction):
+def parse_prediction_old(prediction):
     lines = prediction.splitlines()
+    key = ""
+    chords = ""
     for l in lines:
         if l.startswith("K:"):
             key = l.split(":")[1]
@@ -221,6 +265,29 @@ def parse_prediction(prediction):
     chords = [[[x for x in c.strip().split() if x != ""] for c in line.split(",") ] for line in chords.split(";")]
 
     return key, chords
+
+
+def parse_prediction(prediction):
+    try:
+        if prediction is None:
+            return None, None
+
+        cleaned_prediction = prediction.strip()
+        data = json.loads(cleaned_prediction)
+
+        if not isinstance(data, dict):
+            return None, None
+
+        key = data.get("key", None)
+        chords = data.get("chords", [])
+
+        if not isinstance(key, str) or not isinstance(chords, list):
+            return None, None
+        return key, chords
+
+    except (json.JSONDecodeError, TypeError, AttributeError) as e:
+        print("Error parsing prediction:", e)
+        return None, None
 
 
 def update():
@@ -244,11 +311,14 @@ if example_button.button("Try with an example image"):
     submit_button = True
 
 if file is not None:
-    st.image(file, caption='Uploaded Image', use_column_width=True)
+    st.image(file, caption='Uploaded Image', width="stretch")
     if submit_button:
         with st.spinner("Parsing image..."):
             key = chords = None
-            while key is None or chords is None:
+            out = predict(file)
+            key, chords = parse_prediction(out)
+            
+            if key is None or chords is None:
                 out = predict(file)
                 key, chords = parse_prediction(out)
                         
